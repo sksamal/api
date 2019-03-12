@@ -4,6 +4,6 @@ Repository for CornSoyWater APIs
 * objects: database objects in php
 
 API Endpoitns
-* weather : for weather 
-* corn: for corn endpoint
-* soy: for soy endpoint
+* weather : for weather  rendered as http://hprcc-agron0.unl.edu/cornsoywater/api/weather/
+* corn: for corn endpoint rendered as http://hprcc-agron0.unl.edu/cornsoywater/api/corn/
+* soy: for soy endpoint rendered as http://hprcc-agron0.unl.edu/cornsoywater/api/soy/
