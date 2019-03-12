@@ -1,0 +1,11 @@
+rooting_depth=50
+mgval=3.0
+soil_type=16
+initial_water=75
+seed_depth=1.18
+soil_water_depletion=35
+lat=40.505664
+lng=-98.966389
+irrigation_record=[]
+custom_rainfall=[]
+planting_date=10/16/2018
