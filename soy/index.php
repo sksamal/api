@@ -25,7 +25,7 @@ $data = urldecode(file_get_contents("php://input"));
 $post_data = split("=",$data);
 $data = json_decode($post_data[1]);
 //error_log("post_data=".urldecode(file_get_contents("php://input")),0);	
-//error_log("json_data=".$post_data[1],0);
+error_log("json_data=".$post_data[1],0);
 //error_log("json_decoded=".$data->apikey,0);
 // does query contain anything 
 
@@ -104,10 +104,28 @@ if( !empty($data->sresult))
 else
     $sresult = 'aggr';
 
+# Fill the irrigation amounts/dates
 $irrigation_record = array();
 $custom_rainfall = array();
+if ( !empty($data->irrdata))
+  { 
+     foreach ( $data->irrdata as $irr ) {
+	  if ( !empty($irr->date) &&  !empty($irr->amount) ) {
+	  	$date1 = date_create($irr->date);
+		if($date1 == false) {
+    			echo json_encode(array("result" => "Invalid date :".$irr->date));
+			return;
+		 }
+	  	$date2 = date_create("01/01/".date('Y'));
+	  	$diff = date_diff($date1,$date2)->format("%a")+1;
+	  	if($date1 >= $date2) 
+			$irrigation_record[$diff]=$irr->amount;
+	    } 
+	}	
+  }
 
-$myfile = fopen("/home/cornwater/weai/public_html/api/temp/input.txt", "w");
+
+$myfile = fopen("/home/cornwater/weai/api/temp/input.txt", "w");
 fwrite($myfile,"rooting_depth=".$srdepth."\n");
 fwrite($myfile,"mgval=".$cmgroup."\n");
 fwrite($myfile,"soil_type=".$satexture."\n");
@@ -127,7 +145,7 @@ fclose($myfile);
 $soySim =new SimSoy();
 $soySim->simSoyData($srdepth,$cmgroup,$satexture,$sawater,$ssdepth,$swdepletion,$flat,$flon,$irrigation_record,$custom_rainfall,$cpdate);
 
-$myfile = fopen("/home/cornwater/weai/public_html/api/temp/output.txt","w");
+$myfile = fopen("/home/cornwater/weai/api/temp/output.txt","w");
 fwrite($myfile,"rpheno=".json_encode($soySim->getRPhenology())."\n");
 fwrite($myfile,"vpheno=".json_encode($soySim->getVPhenology())."\n");
 fwrite($myfile,"date=".json_encode($soySim->getDate())."\n");
