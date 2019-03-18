@@ -34,7 +34,9 @@ $data = json_decode($post_data[1]);
 if(!$auth->validate($data)) { 
 
     http_response_code(200);
-    echo json_encode("result:Invalid or no api key provided");
+    echo json_encode(
+        array("result" => "Invalid or no api key provided.")
+    );
     return;
 } 
 
