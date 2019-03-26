@@ -6,6 +6,6 @@ seed_depth=1.18
 soil_water_depletion=35
 lat=40.505664
 lng=-98.966389
-irrigation_record={"1":"1.1","32":"2.3"}
+irrigation_record=[]
 custom_rainfall=[]
 planting_date=10/16/2018

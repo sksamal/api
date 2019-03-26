@@ -1,0 +1,35 @@
+lat=40.505664
+lng=-98.966389
+planting_date=3/4/2019
+relative_maturity=90
+plant_population=24
+soil_rooting_depth=60
+soil_residues_coverage=50
+topsoil_bulk_density=1.3
+topsoil_moisture=1
+subsoil_moisture=1
+topsoil_texture=3
+subsoil_texture=3
+sresult=cstage
+irrigation_record="\r\n3 19 1\r\n3 21 2"
+custom_rainfall=[]
+awdn_id=a255569
+plant_month=3
+plant_day=4
+
+
+content=
+api_special_9999
+weather_files/a255569_2019_9999.wth
+3 4
+90
+24
+50
+3 3
+1.3
+1
+1
+60
+3 19 1
+3 21 2
+0 0       0
