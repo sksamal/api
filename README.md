@@ -15,3 +15,7 @@ API Code
 *  weather/index.php --> weather api
 *  corn/index.php --> corn api
 *  soy/index.php --> soy api
+
+API Usage and Documentation
+
+* Refer to the "CornSoyAPI Request Types.docx" document attached in the repository
