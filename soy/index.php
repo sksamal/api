@@ -251,7 +251,7 @@ else if($sresult == 'aggr') {
     $aggr["total_irrigation"]=$soySim->getTotalIrrigation();
     $aggr["total_water_deficit"]=$soySim->getTotalWaterDeficit();
     $aggr["current_available_water"]=$soySim->getCurrentAvailableWater();
-    $aggr_arr["aggregate_results"]=$aggr;
+    $aggr_arr["results"]=$aggr;
     echo json_encode($aggr_arr);
 }
  
