@@ -1,4 +1,8 @@
 <?php
+# This is the end-point for weather station API currently hosted at
+# http://hprcc-agron0.unl.edu/cornsoywater/api/soy
+# it validates the apikey, then uses the consoywater code/scripts to 
+# generate simulation and fulfill the request
 // required headers
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -25,11 +29,11 @@ $data = urldecode(file_get_contents("php://input"));
 $post_data = split("=",$data);
 $data = json_decode($post_data[1]);
 //error_log("post_data=".urldecode(file_get_contents("php://input")),0);	
-error_log("json_data=".$post_data[1],0);
+//error_log("json_data=".$post_data[1],0);
 //error_log("json_decoded=".$data->apikey,0);
 // does query contain anything 
 
- error_log("user authenticated=".$auth->validate($data));
+// error_log("user authenticated=".$auth->validate($data));
 if(!$auth->validate($data)) { 
 
     http_response_code(200);
@@ -125,6 +129,7 @@ if ( !empty($data->irrdata))
   }
 
 
+// debugging
 $myfile = fopen("/home/cornwater/weai/api/temp/input.txt", "w");
 fwrite($myfile,"rooting_depth=".$srdepth."\n");
 fwrite($myfile,"mgval=".$cmgroup."\n");
@@ -163,6 +168,11 @@ fwrite($myfile,"total_water_deficit=".json_encode($soySim->getTotalWaterDeficit(
 fwrite($myfile,"current_available_water=".json_encode($soySim->getCurrentAvailableWater())."\n");
 fclose($myfile);
 
+// Create response based on what is requested in sresult
+// cstage --> crop stage records
+// awater --> available water records
+// wstress --> water stress
+// aggr --> aggregate info of simulation 
 if($sresult == 'cstage') {
    $crpstg_arr = array();
    $crpstg_arr["field_latitude"]=$data->flat;

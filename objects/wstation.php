@@ -74,7 +74,7 @@ class wstation{
 	return $stmt; 
   }
 
-  //Funtion for nearest weather station
+  //Function for nearest weather station
   function queryByField($userLat,$userLong, $selectState="ALL") {
 	$distance=array();
 	$lat=array();

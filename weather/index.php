@@ -1,4 +1,10 @@
 <?php
+
+# This is the end-point for weather station API currently hosted at
+# http://hprcc-agron0.unl.edu/cornsoywater/api/weather
+# it validates the apikey, then uses the weatherdb to fulfill
+# the request
+ 
 // required headers
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -33,6 +39,7 @@ $data = json_decode($post_data[1]);
 //error_log("auth=".$auth->validate($data));
 if(!$auth->validate($data)) { 
 
+    // not authenticated
     http_response_code(200);
     echo json_encode(
         array("result" => "Invalid or no api key provided.")
@@ -46,7 +53,7 @@ if(  !empty($data->stnId) ||   !empty($data->stnName) )
 
   if (!empty($data->stnId))
     $wstation->idAWDN = $data->stnId;
-  if (!empty($data->sname))
+  if (!empty($data->stnName))
     $wstation->stnName = $data->stnName;
 
   $stmt = $wstation->querry();
@@ -84,6 +91,18 @@ if($num>0){
  
     // wstations array
     $wstations_arr=array();
+    if ( !empty($data->fieldLat) && !empty($data->fieldLon) ) {
+    	$wstations_arr["field_latitude"]=$data->fieldLat;
+    	$wstations_arr["field_longitude"]=$data->fieldLon;
+      }
+    if ( !empty($data->stnState) ) 
+    	$wstations_arr["station_state"]=$data->stnState;
+    if ( !empty($data->stnId) ) 
+    	$wstations_arr["station_id"]=$data->stnId;
+    if (!empty($data->stnName))
+    	$wstations_arr["station_name"]=$data->stnName;
+
+    $wstations_arr["count"]=$num;
     $wstations_arr["records"]=array();
  
     // retrieve our table contents
@@ -106,7 +125,9 @@ if($num>0){
             "stnState" => $stnState,
             "stnDataSource" => $stnDataSource
         );
- 
+
+    if ( !empty($data->fieldLat) && !empty($data->fieldLon) ) 
+	  $wstation_item["stnMiles"] = $wstation->distance($data->fieldLat,$data->fieldLon,$stnLat, $stnLong);
         array_push($wstations_arr["records"], $wstation_item);
     }
  
