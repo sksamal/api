@@ -18,4 +18,4 @@ API Code
 
 API Usage and Documentation
 
-* Refer to the "CornSoyAPI Request Types.docx" document [](url)in the repository
+* Refer to the "CornSoyAPI Request Types.docx" document [](https://git.unl.edu/ssamal/api/blob/master/CornSoyAPI_Request_Types.docx) in the repository
