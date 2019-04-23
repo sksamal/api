@@ -12,6 +12,6 @@ API Endpoints
 API Code
 * Written in PHP and uses existing cornsoywater DbS (weather and cornsoywat simulation)
 
-  weather/index.php --> weather api
-  corn/index.php --> corn api
-  soy/index.php --> soy api
+*  weather/index.php --> weather api
+*  corn/index.php --> corn api
+*  soy/index.php --> soy api
