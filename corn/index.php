@@ -478,13 +478,13 @@ else if($sresult == 'aggr') {
 
     $aggr_arr=array();
     $aggr = array();
-    $aggr["available_water"]=$available_water;
-    $aggr["total_rainfall"]=$total_rainfall;
-    $aggr["total_irrigation"]=$total_irrigation;
-    $aggr["water_drain"]=$water_drain;
-    $aggr["water_consumption"]=$water_consumption;
-    $aggr["current_water_balance"]=$current_water_balance;
-    $aggr_arr["aggregate_results"]=$aggr;
+    $aggr["available_water"]=rtrim($available_water);
+    $aggr["total_rainfall"]=rtrim($total_rainfall);
+    $aggr["total_irrigation"]=rtrim($total_irrigation);
+    $aggr["water_drain"]=rtrim($water_drain);
+    $aggr["water_consumption"]=rtrim($water_consumption);
+    $aggr["current_water_balance"]=rtrim($current_water_balance);
+    $aggr_arr["results"]=$aggr;
     echo json_encode($aggr_arr);
 }
  
