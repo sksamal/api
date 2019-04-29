@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	
+	<title>CSIWS Web Services Query Builder</title>
+	<link rel="stylesheet" type="text/css" href="./csiws/jquery-ui.css">
+	<link rel="stylesheet" type="text/css" href="./csiws/CSIS_Builder.css">
+	<!--<script src = "https://code.jquery.com/jquery-1.12.4.js"></script>
+	<script src = "https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<link href = "https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css	"
+		  rel = "stylesheet"> -->
+
+	<script type="text/javascript" src="./csiws/jquery.min.js.download"></script>
+	<script type="text/javascript" src="./csiws/jquery-migrate-1.2.1.min.js.download"></script>
+	<script type="text/javascript" src="./csiws/jquery-ui.min.js.download"></script>
+	<script type="text/javascript" src="./csiws/date.min.js.download"></script>
+	<script type="text/javascript" src="./csiws/json2.min.js.download"></script>
+	<script type="text/javascript" src="./csiws/jquery.CSIS-buttonBar.js.download"></script>
+	<script>
+        $(function() {
+            $( "#cpdate" ).datepicker();
+        });
+	</script>
+	<noscript>
+		<style type="text/css">
+			.pagecontainer {display:none;}
+		</style>
+		<div class="noscriptmsg">
+		It appears you don't have JavaScript enabled.  Please turn on JavaScript to use this site.
+		</div>
+	</noscript>
+	<script type="text/javascript">
+		//var serverUrl = "http://data" +
+		//	(window.location.hash.length > 1 ? "." + window.location.hash.slice(1) : "") +
+		//	".rcc-CSIS.org/";
+			var serverUrl = "http://hprcc-agron0.unl.edu/cornsoywater/api/weather/?";
+		function makeList(x) {
+			var l = [];
+			$(x.split(",")).each(function (i, e) {
+				l.push(parseFloat(e.replace(/[^\d\-\.]/g, '')));
+			});
+			return l;
+		}
+		function makeObject(items) {
+			var newObj = {};
+			$.each(items, function (i, j) {
+				if (j[1]) {
+					newObj[j[0]] = j[1];
+				}
+			});
+			return newObj;
+		}
+		function table_events(ttype, input_name, table) {
+			$("#specs")
+				.off("focusin focusout", ttype + "[name=" + input_name + "]")
+				// need to delay show/hide to allow time for click event to fire
+				.on("focusin", ttype + "[name=" + input_name + "]", function () {
+					setTimeout(function () {
+						$("#" + table).show();
+					}, 200);
+				})
+				.on("focusout", ttype + "[name=" + input_name + "]", function () {
+					setTimeout(function () {
+						$("#" + table).hide();
+					}, 200);
+				});
+		}
+		function process_request(params) {
+			var xdr, res,
+				args = JSON.stringify(params),
+				server = serverUrl + $("#wstype input:checked").val(),
+				postSuccess = function (res) {
+					if (params.output && params.output.toLowerCase() === "csv") 	{
+						$("#jresults_h2 span").html('Results (CSV)');
+						$("#jresults").empty().html("<pre>" + res + "<\/pre>");
+					} else {
+						$("#jresults_h2 span").html('Results (JSON)');
+						$("#jresults").empty().html("<pre>" + JSON.stringify(res) + "<\/pre>");
+						$("#formatButton").text("Format").show().off("click").on("click", function () {
+							$(this).hide();
+							if ($(this).text() === "Format") {
+								$("#jresults_h2 span").html('Results (formatted)');
+								$("#jresults").empty();
+								$.each(res, function (key, val) {
+									$("#jresults").append("<pre>" + key + ":<\/pre>");
+									if (key === "data" && typeof val === "string" && val.search("image/png;base64") >= 0) {
+										$("#jresults").append("<img src='" + val + "'><\/img>");
+									} else {
+										$(val).each(function (i, elem) {
+											$("#jresults").append("<pre>" + JSON.stringify(elem, undefined, 4) + "<\/pre>");
+                              			});
+									}
+								});
+								$(this).text("Back to raw").show();
+							} else {
+								$("#jresults_h2 span").html('Results (JSON)');
+								$("#jresults").empty().html("<pre>" + JSON.stringify(res) + "<\/pre>");
+								$(this).text("Format").show();
+							}
+						});
+					}
+				},
+				postError = function (xhr, textStatus, error) {
+    				$("#jresults").empty().html("<p>Web services call failed: " + error + "</p>");
+				};
+			$("#jparams_h2").html('Parameters (JSON)');
+			$("#jparams").empty().html("<pre>" + args + "<\/pre>");
+			$("#jresults_h2 span").html('Results');
+			$('#jresults').empty().html('Loading...');
+			$("#formatButton").hide();
+			$("#output").show();
+			if (server.search("General") >= 0) {
+				server += $("select[name=area] :selected").text();
+				$("#jparams pre").prepend("Server=/General/" + $('select[name=area] :selected').text() + "&nbsp;&nbsp;&nbsp;params=");
+			}
+			if (params.output && params.output.toLowerCase() === "image") {
+				$("#jresults_h2 span").html('Results (PNG)');
+				$("#jresults").empty().html("<img src='" + server + "?params=" + args + "'><\/img>");
+			} else {
+				 if (window.XDomainRequest) {
+					xdr = new XDomainRequest();
+					xdr.open("GET", server + "?params=" + args);
+					xdr.onload = function () {
+						res = $.parseJSON(xdr.responseText);
+						postSuccess(results);
+					};
+					xdr.onerror = postError;
+					xdr.onprogress = function () { };
+					xdr.ontimeout = function () { };
+					setTimeout(function () {
+						xdr.send();
+					}, 0);
+				} else {
+					$.ajax(server, {
+						type: 'POST',
+						data: {params: args},
+                        //data: {args},
+						dataType: 'json', //params.output && params.output.toLowerCase() === "csv" ? 'text' : 'json',
+						crossDamain: true,
+						success: postSuccess,
+						error: postError
+					});
+				}
+			}
+			$("#jparams").one("keyup", function () {
+				if (server.search("General") < 0) {
+					$("#jparams_h2").html('Parameters (JSON) <button id="submitJson" class="otherButtons ui-corner-all ui-state-default">Submit</button>');
+					$("#specs input,textarea,button").attr("disabled", true).addClass("grayout");
+					$("#submitJson").attr("disabled", false).on("click", function () {
+						$("#specs input,textarea,button").attr("disabled", false).removeClass("grayout");
+						process_request(JSON.parse($("#jparams").text()));
+					});
+				}
+			});
+		}
+		function collect_data() {
+			var params = {}, img_obj = {};
+			$('#specs input').not(".elems_opts input").not(".image_opts input").each(function () {
+			    // irdate and iramount captured later
+                if (this.name.length && this.value.length && this.name !="irdate" && this.name !="iramount") {
+                    params[this.name] = this.value.replace(/,\s/g, ",").toLowerCase();
+                }
+   		});
+			if ($("textarea[name=elems_container]").is(":visible") && $("textarea[name=elems_container]").val().length) {
+				params.elems = JSON.parse($("textarea[name=elems_container]").val());
+			}
+			if ($("#showimgopts").length && $("#showimgopts").is(":checked")) {
+				$('.image_opts input').each(function () {
+					if (this.name.length && this.value.length) {
+						if (this.name === 'levels') {
+							img_obj.levels = makeList(this.value);
+						} else if ($.isNumeric(this.value)) {
+							img_obj[this.name] = parseInt(this.value, 10);
+						} else {
+							img_obj[this.name] = this.value.replace(/,\s/g, ",");
+						}
+					}
+				});
+				params.image = img_obj;
+			}
+			if (params.meta && params.meta.search('valid_daterange') >= 0 && !params.elems) {
+				alert("Need to specify elements when requesting valid_daterange");
+				$("[name=elems]").addClass("makeRequired").effect("highlight", {color: "yellow"}, 1000).focus();
+				return false;
+			}
+
+            var irdates = document.getElementsByName("irdate");
+            var iramounts = document.getElementsByName("iramount");
+			if(irdates.length >0) {
+			    params["irrdata"] = [];
+              //  params["irdate"] = {};
+              //  params["iramount"] = {};
+                for (i = 0; i < irdates.length; i++) {
+                    params["irrdata"][i] = {};
+                    params["irrdata"][i]["date"] = irdates[i].value;
+                    params["irrdata"][i]["amount"] = iramounts[i].value;
+                    //params["irdate"][i] = irdates[i].value;
+                    //params["iramount"][i] = iramounts[i].value;
+                }
+            }
+
+			var sresult = $("#sresult:checked").val();
+			if (sresult !="")
+			    params.sresult = sresult;
+
+            process_request(params);
+		}
+
+		function go_stndata() {
+			$("#prelimMsg").hide();
+			$("#specs").empty().append('<h3>Weather Stations API</h3><br><br><table class="input_opts">' +
+                '<h2>Field/Station Info<\/h2>' +
+                '<table class="input_opts">' +
+                '<tr><th>APIKey: <td><input type="text" disabled name="apikey" size= 32 value="e57c858f031526a86bcd7caf50842cf2"\/><\/tr>' +
+                '<tr><th>Latitude:<td><input type="text" name="fieldLat" size=12 \/><\/tr>' +
+                '<tr><th>Longitude:<td><input type="text" name="fieldLon" size=12 \/><\/tr>' +
+                '<tr><th>Station State:<td><input type="text" name="stnState" size=12 \/><\/tr>' +
+                '<tr><th>Station Id:<td><input type="text" name="stnId" size=12 \/><\/tr>' +
+                '<tr><th>Station Name:<td><input type="text" name="stnName" size=12 \/><\/tr>' +
+                '<\/table>' +
+				'<p><button id="request_submit" class="submitButton ui-button1">Submit<\/button><\/p>');
+			$("#specs :input").addClass("ui-widget-content ui-corner-all ui-state-default");
+            $("#stndata_button").addClass("ui-corner-all ui-state-active");
+			$("#request_submit").button();
+			table_events("input", "meta", "meta_table");
+            serverUrl = "http://hprcc-agron0.unl.edu/cornsoywater/api/weather/?";
+		}
+
+        function go_soysimdata() {
+            var others;
+            $("#prelimMsg").hide();
+            $("#specs").empty().append('<h3>Soyabean Simulation API</h3><table class="input_opts" style="margin-top:8px;">' +
+				'<tr><th>APIKey: <td><input type="text" name="apikey" size= 32 value="e57c858f031526a86bcd7caf50842cf2"\/><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<h2>Field Information<\/h2>' +
+                '<table class="input_opts" style="margin-top:8px;">' +
+                //'<tr class="mmeta"><td colspan=2><span style="font-style:italic;">(Mandatory)<\/span><\/tr>' +
+                '<tr><th>Latitude:<td><input type="text" name="flat" size=15 value = "40.505664"\/><span style="color: red; ">*</span><\/tr>' +
+                '<tr class="mmeta"><th>Longitude:<td><input type="text" name="flon" size=15 value = "-98.966389"\/><span style="color: red; ">*</span><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<h2>Crop Management<\/h2>' +
+                '<table class="input_opts" style="margin-top:8px;">' +
+                //'<tr class="mmeta"><td colspan=2><span style="font-style:italic;">(Mandatory)<\/span><\/tr>' +
+                '<tr><th>Planting Date:<td><input type="text" name="cpdate" id="cpdate" size=15 value = "10/16/2018"\/><span style="color: red; ">*</span><\/tr>' +
+                '<tr class="mmeta"><th>Maturity Group:<td><input type="text" name="cmgroup" size=15 value = "3.0"\/><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<h2>Soil Properties<\/h2>' +
+                '<table class="input_opts" style="margin-top:8px;">' +
+                //'<tr class="mmeta"><td colspan=2><span style="font-style:italic;">(Mandatory)<\/span><\/tr>' +
+                '<tr class="mmeta"><th>Rooting Depth :<td><input type="text" name="srdepth" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Available water at planting day: <td><input type="text" name="sawater" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Average Soil Texture :<td><input type="text" name="satexture" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Seed Depth:<td><input type="text" name="ssdepth" size=15 \/><span style="font-style:italic;">(Optional)</span><\/tr>' +
+                '<tr class="mmeta"><th>Water Depletion:<td><input type="text" name="swdepletion" size=15 \/><span style="font-style:italic;">(Optional)</span><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+
+                '<table class="input_opts" style="margin-top:8px;">' +
+                '<h2>Irrigation records<\/h2>' +
+                	'<table class="input_opts" id="irrrecord">' +
+                	'<tr class="mmeta"><th><td align="center"><b>Date</b></td><td align="center"><b>Amount</b></td><td></td><\/tr>' +
+                	'<tr class="mmeta"><th><td><input type="text" name="irdate" size=10 /></td><td><input type="text" name="iramount" size=10 /></td>' +
+					'<td> &nbsp; &nbsp; &nbsp;<button id="addrecord" class="ui-button">Add record</button></td><\/tr>' +
+
+            //    	'<tr><th><td><\/tr>' +
+                	'<\/table>' +
+                '<\/table>' +
+
+                '<h2>Output<\/h2>' +
+                '<table class="input_opts">' +
+                '<tr class="mmeta"><th><td valign="center"><input type="radio" name="sresult" id = "sresult" value="cstage" checked><b><span style="font-size: medium; "> Crop Stage</span></b></td>' +
+				'<td><input type="radio" name="sresult" id = "sresult" value="awater"><b><span style="font-size: medium; ">Available Water</span></b></td><td></td><\/tr>' +
+                '<tr class="mmeta"><th><td><input type="radio" name="sresult" id = "sresult" value="wstress"><b><span style="font-size: medium; ">Water Stress</span></b></td>' +
+				'<td><input type="radio" name="sresult" id = "sresult" value="aggr"><b><span style="font-size: medium; ">Other Aggregate Info</span> </b></td><\/tr>' +
+				//'<select name = "sresult" id = "sresult"> <option value="cstage">Crop Stage</option>\n' +
+               // '  <option value="awater">Available Water</option>\n' +
+               // '  <option value="wstress" selected>Water Stress</option>\n' +
+               // '  <option value="aggr">Other aggregate Info</option></select></td><\/tr>' +
+                '<\/table>' +
+                '<p><button id="request_submit" class="submitButton ui-button1">Submit<\/button><\/p>');
+            $("#specs :input").addClass("ui-widget-content ui-corner-all ui-state-default");
+            $("#request_submit").button();
+            $(".ometa").hide();
+            $(".mmeta input").on("keyup", function () {
+                if ($(this).val().length) {
+                    $("input[name=sids]").parent().parent().fadeOut('fast');
+                    $(".ometa").show();
+                } else {
+                    others = 0;
+                    $(".mmeta input").each(function (i, j) {
+                        others += j.value.length;
+                    });
+                    if (!others) {
+                        $("input[name=sids]").parent().parent().fadeIn('fast');
+                        $(".ometa").hide();
+                    }
+                }
+            });
+            $("input[name=sids]").on("keyup", function () {
+                if ($(this).val().length) {
+                    $(".mmeta").fadeOut('fast');
+                } else {
+                    $(".mmeta").fadeIn('fast');
+                }
+            });
+            $("input[name=meta]").on("keyup", function () {
+                if ($(this).val().length) {
+                    $("input[name=output]").val('json').parent().parent().fadeOut('fast');
+                } else {
+                    $("input[name=output]").parent().parent().fadeIn('fast');
+                }
+                if ($(this).val().search(/valid_daterange/i) >= 0) {
+                    $("input[name=elems]").addClass("makeRequired").parent().parent().show();
+                } else if ($("input[name=sids]").val().length) {
+                    $("input[name=elems]").removeClass("makeRequired").parent().parent().hide();
+                }
+            });
+
+            $("#addrecord").click(function () {
+                $('#irrrecord tr:last').after('<tr class="mmeta"><th><td><input class="ui-widget-content	 ui-corner-all" type="text" name="irdate" size=10 /></td><td><input type="text" class="ui-widget-content ui-corner-all" name="iramount" size=10 /></td>' +
+                    '<td> &nbsp; &nbsp; &nbsp;</td><\/tr>');
+            });
+
+            $("#singledate").on("change", function () {
+                if ($(this).is(':checked')) {
+                    $("input[name=sdate]").parent().parent().children("th").text("Date:");
+                    $("input[name=edate]").parent().parent().hide();
+                } else {
+                    $("input[name=sdate]").parent().parent().children("th").text("Start Date:");
+                    $("input[name=edate]").parent().parent().show();
+                }
+            });
+            $("#soysimdata_button").addClass("ui-corner-all ui-state-active");
+            table_events("input", "meta", "meta_table");
+            serverUrl = "http://hprcc-agron0.unl.edu/cornsoywater/api/soy/?";
+        }
+
+        function go_cornsimdata() {
+            var others;
+            $("#prelimMsg").hide();
+            $("#specs").empty().append('<h3>Corn Simulation API</h3><table class="input_opts" style="margin-top:8px;">' +
+                '<tr><th>APIKey: <td><input type="text" name="apikey" size= 32 value="e57c858f031526a86bcd7caf50842cf2"\/><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<h2>Field Information<\/h2>' +
+                '<table class="input_opts" style="margin-top:8px;">' +
+                //'<tr class="mmeta"><td colspan=2><span style="font-style:italic;">(Mandatory)<\/span><\/tr>' +
+                '<tr><th>Latitude:<td><input type="text" name="flat" size=15 value = "40.505664"\/><span style="color: red; ">*</span><\/tr>' +
+                '<tr class="mmeta"><th>Longitude:<td><input type="text" name="flon" size=15 value = "-98.966389"\/><span style="color: red; ">*</span><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<h2>Crop Management<\/h2>' +
+                '<table class="input_opts" style="margin-top:8px;">' +
+                //'<tr class="mmeta"><td colspan=2><span style="font-style:italic;">(Mandatory)<\/span><\/tr>' +
+                '<tr><th>Planting Date:<td><input type="text" name="cpdate" id="cpdate" size=15 value = "10/16/2018"\/><span style="color: red; ">*</span><\/tr>' +
+                '<tr class="mmeta"><th>Relative Maturity:<td><input type="text" name="crmaturity" size=15 value = "90"\/><\/tr>' +
+                '<tr class="mmeta"><th>Plant Population:<td><input type="text" name="cppopulation" size=15 value = "20"\/><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<h2>Soil Properties<\/h2>' +
+                '<table class="input_opts" style="margin-top:8px;">' +
+                //'<tr class="mmeta"><td colspan=2><span style="font-style:italic;">(Mandatory)<\/span><\/tr>' +
+                '<tr class="mmeta"><th>Rooting Depth :<td><input type="text" name="srdepth" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Surface residues coverage: <td><input type="text" name="ssresidues" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Top soil bulk density: <td><input type="text" name="tsdensity" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Top soil (1 foot) moisture at planting: <td><input type="text" name="tsmoisture" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Sub soil (1 foot) moisture at planting: <td><input type="text" name="ssmoisture" size=15 \/><\/tr>' +
+                '<tr class="mmeta"><th>Top soil (1 foot) texture:<td><input type="text" name="tstexture" size=15 \/><span style="font-style:italic;">(Optional)</span><\/tr>' +
+                '<tr class="mmeta"><th>Sub soil (below 1 foot) texture:<td><input type="text" name="sstexture" size=15 \/><span style="font-style:italic;">(Optional)</span><\/tr>' +
+                '<tr><th><td><\/tr>' +
+                '<\/table>' +
+
+                '<table class="input_opts" style="margin-top:8px;">' +
+                '<h2>Irrigation records<\/h2>' +
+                '<table class="input_opts" id="irrrecord">' +
+                '<tr class="mmeta"><th><td align="center"><b>Date</b></td><td align="center"><b>Amount</b></td><td></td><\/tr>' +
+                '<tr class="mmeta"><th><td><input type="text" name="irdate" size=10 /></td><td><input type="text" name="iramount" size=10 /></td>' +
+                '<td> &nbsp; &nbsp; &nbsp;<button id="addrecord" class="ui-button">Add record</button></td><\/tr>' +
+
+                //    	'<tr><th><td><\/tr>' +
+                '<\/table>' +
+                '<\/table>' +
+
+                '<h2>Output<\/h2>' +
+                '<table class="input_opts">' +
+                '<tr class="mmeta"><th><td valign="center"><input type="radio" name="sresult" id = "sresult" value="cstage" checked><b><span style="font-size: medium; "> Crop Stage</span></b></td>' +
+                '<td><input type="radio" name="sresult" id = "sresult" value="awater"><b><span style="font-size: medium; ">Available Water</span></b></td><td></td><\/tr>' +
+                '<tr class="mmeta"><th><td><input type="radio" name="sresult" id = "sresult" value="wstress"><b><span style="font-size: medium; ">Water Stress</span></b></td>' +
+                '<td><input type="radio" name="sresult" id = "sresult" value="aggr"><b><span style="font-size: medium; ">Other Aggregate Info</span> </b></td><\/tr>' +
+                //'<select name = "sresult" id = "sresult"> <option value="cstage">Crop Stage</option>\n' +
+                // '  <option value="awater">Available Water</option>\n' +
+                // '  <option value="wstress" selected>Water Stress</option>\n' +
+                // '  <option value="aggr">Other aggregate Info</option></select></td><\/tr>' +
+                '<\/table>' +
+                '<p><button id="request_submit" class="submitButton ui-button1">Submit<\/button><\/p>');
+            $("#specs :input").addClass("ui-widget-content ui-corner-all ui-state-default");
+            $("#request_submit").button();
+            $(".ometa").hide();
+            $(".mmeta input").on("keyup", function () {
+                if ($(this).val().length) {
+                    $("input[name=sids]").parent().parent().fadeOut('fast');
+                    $(".ometa").show();
+                } else {
+                    others = 0;
+                    $(".mmeta input").each(function (i, j) {
+                        others += j.value.length;
+                    });
+                    if (!others) {
+                        $("input[name=sids]").parent().parent().fadeIn('fast');
+                        $(".ometa").hide();
+                    }
+                }
+            });
+            $("input[name=sids]").on("keyup", function () {
+                if ($(this).val().length) {
+                    $(".mmeta").fadeOut('fast');
+                } else {
+                    $(".mmeta").fadeIn('fast');
+                }
+            });
+            $("input[name=meta]").on("keyup", function () {
+                if ($(this).val().length) {
+                    $("input[name=output]").val('json').parent().parent().fadeOut('fast');
+                } else {
+                    $("input[name=output]").parent().parent().fadeIn('fast');
+                }
+                if ($(this).val().search(/valid_daterange/i) >= 0) {
+                    $("input[name=elems]").addClass("makeRequired").parent().parent().show();
+                } else if ($("input[name=sids]").val().length) {
+                    $("input[name=elems]").removeClass("makeRequired").parent().parent().hide();
+                }
+            });
+
+            $("#addrecord").click(function () {
+                $('#irrrecord tr:last').after('<tr class="mmeta"><th><td><input class="ui-widget-content	 ui-corner-all" type="text" name="irdate" size=10 /></td><td><input type="text" class="ui-widget-content ui-corner-all" name="iramount" size=10 /></td>' +
+                    '<td> &nbsp; &nbsp; &nbsp;</td><\/tr>');
+            });
+
+            $("#singledate").on("change", function () {
+                if ($(this).is(':checked')) {
+                    $("input[name=sdate]").parent().parent().children("th").text("Date:");
+                    $("input[name=edate]").parent().parent().hide();
+                } else {
+                    $("input[name=sdate]").parent().parent().children("th").text("Start Date:");
+                    $("input[name=edate]").parent().parent().show();
+                }
+            });
+            $("#soysimdata_button").addClass("ui-corner-all ui-state-active");
+            table_events("input", "meta", "meta_table");
+            serverUrl = "http://hprcc-agron0.unl.edu/cornsoywater/api/corn/?";
+        }
+
+        $(function () {
+		/*	$('<div id="wstypebar"><\/div>')
+				.appendTo("#builder")
+				.buttonBar({
+					barName: "wstype",
+					barOrient: "horizontal",
+					buttonInfo: [["stnmeta_button", "StnMeta"], ["stndata_button", "StnData"], ["multistndata_button", "MultiStnData"], ["griddata_button", "GridData"], ["general_button", "General"]],
+					buttonDefault: "stndata_button"
+				}); */
+			$("#wstype input").on("click", function () {
+				$(".codes").parent().hide();
+				$("#output").hide();
+			});
+			$("#stndata_button").val("StnData").on("click", go_stndata).click();
+            $("#soysimdata_button").val("SoySimData").on("click", go_soysimdata);
+            $("#cornsimdata_button").val("CornSimData").on("click", go_cornsimdata);
+			$("#builder").append('<div id="prelimMsg" class="ui-helper-hidden">... Image specifications subject to change based on feedback ...</div>');
+			$("#infoDialog").dialog({
+				autoOpen: false,
+				modal: true,
+				show: true,
+				hide: true,
+				position: "center",
+				width: "auto"
+			});
+			$("#specs").on("click", "#request_submit", collect_data);
+			$("#specs").on("change", ".makeRequired", function () {
+				$(this).removeClass("makeRequired");
+			});
+			$("#allspecs").on("click", ".codes", function () {
+				$("#infoDialog").dialog("option", "title", $(this).find('caption').text()).html($(this).parent().html()).dialog('open');
+				$("#infoDialog caption").remove();
+			});
+			$("#interval_hover").hover(
+			  function() {
+			    $(this).find("span:first-child").hide();
+				$("#interval_details").show();
+			  }, function() {
+			    $(this).find("span:first-child").show();
+				$("#interval_details").hide();
+			  }
+			);
+			// setup all events for all the tables (except bbox, state and meta, which differ between General and others)
+			table_events("input", "add", "add_table");
+			table_events("input", "duration", "duration_table");
+			table_events("input", "edate", "date_table");
+			table_events("input", "elems", "elems_table");
+			table_events("input", "id", "general_table");
+			table_events("input", "interval", "interval_table");
+			table_events("input", "maxmissing", "maxmissing_table");
+			table_events("input", "name", "elems_table");
+			table_events("input", "normal", "normal_table");
+			table_events("input", "output", "output_table");
+			table_events("input", "prec", "prec_table");
+			table_events("input", "sdate", "date_table");
+			table_events("input", "season_start", "season_start_table");
+            table_events("input", "apikey", "api_table");
+			table_events("input", "stnId", "sid_table");
+            table_events("input", "stnName", "sid_table");
+            table_events("input", "fieldLat", "fc_table");
+            table_events("input", "fieldLon", "fc_table");
+            table_events("input", "flat", "fc_table");
+            table_events("input", "flon", "fc_table");
+            table_events("input", "cpdate", "pd_table");
+            table_events("input", "cmgroup", "soy_cm_table");
+            table_events("input", "crmaturity", "corn_cm_table");
+            table_events("input", "cppopulation", "corn_cm_table");
+            table_events("input", "srdepth", "srd_table");
+            table_events("input", "sawater", "soy_sp_table");
+            table_events("input", "satexture", "soy_sp_table");
+            table_events("input", "ssdepth", "soy_sp_table");
+            table_events("input", "swdepletion", "soy_sp_table");
+            table_events("input", "ssresidues", "corn_sp_table");
+            table_events("input", "tsdensity", "corn_sp_table");
+            table_events("input", "tsmoisture", "corn_sp_table");
+            table_events("input", "ssmoisture", "corn_sp_table");
+            table_events("input", "tstexture", "corn_sp_table");
+            table_events("input", "sstexture", "corn_sp_table");
+            table_events("input", "irdate", "ir_table");
+            table_events("input", "iramount", "ir_table");
+            table_events("input", "stnState", "sid_table");
+            table_events("input", "sresult", "sim_table");
+			table_events("input", "sids", "sid_table");
+			table_events("select", "area", "general_table");
+			table_events("textarea", "elems_container", "elems_keys_table");
+			table_events("input", "loc", "loc_table");
+			table_events("input", "area_reduce", "area_reduce_table");
+			table_events("input", "type", "type_table");
+			table_events("input", "info_only", "info_only_table");
+			table_events("input", "proj", "proj_table");
+			table_events("input", "overlays", "overlays_table");
+			table_events("input", "width", "width_height_table");
+			table_events("input", "height", "width_height_table");
+			table_events("input", "levels", "levels_table");
+			table_events("input", "groupby", "groupby_table");
+			table_events("input", "units", "units_table");
+			// Ajax error handling
+			$.ajaxSetup({
+				error: function (x, e) {
+					if (x.status === 0) {
+						$("#jresults").empty().html("<pre>" + serverUrl + " is offline - check your network.<\/pre>");
+					} else if (x.status === 404) {
+						$("#jresults").empty().html("<pre>Requested URL not found.<\/pre>");
+					} else if (x.status === 500) {
+						$("#jresults").empty().html("<pre>Internal Server Error.<\/pre>");
+					} else if (e === "parsererror") {
+						$("#jresults").empty().html("<pre>Error parsing JSON response.<\/pre>");
+					} else if (e === "timeout") {
+						$("#jresults").empty().html("<pre>Request timed out<\/pre>.");
+					} else {
+						$("#jresults").empty().html("<pre>Error: " + x.responseText + "<\/pre>");
+					}
+				}
+			});
+		});
+	</script>
+  </head>
+
+<body>
+<div class="pagecontainer">
+<h2 style="margin-bottom:0px;">CornSoy Simulation(CSS) API Query Builder</h2>
+<div id="builder">
+	<div id="wstypebar" class="ui-widget ui-helper-reset"><div id="wstype" class="ui-buttonset" style="text-align: center; margin-right: 0px;">
+		<input type="radio" name="wstype" id="stndata_button" class="ui-helper-hidden-accessible" value="StnMeta"><label for="stndata_button" class="ui-button ui-widget ui-state-default ui-button-text-only" role="button" aria-pressed="false"><span class="ui-button-text">Station</span></label>
+		<input type="radio" name="wstype" id="cornsimdata_button" class="ui-helper-hidden-accessible" value="CornSimData"><label for="cornsimdata_button" class="ui-button ui-widget ui-state-default ui-button-text-only" role="button" aria-pressed="false"><span class="ui-button-text">Corn Sim</span></label>
+		<input type="radio" name="wstype" id="soysimdata_button" class="ui-helper-hidden-accessible" value="SoySimData"><label for="soysimdata_button" class="ui-button ui-widget ui-state-default ui-button-text-only" role="button" aria-pressed="false"><span class="ui-button-text">Soy Sim</span></label>
+	</div>
+<div id="allspecs">
+<div id="specs">
+
+<h2>Field inputs</h2><table class="input_opts" style="margin-top:8px;"><tbody><tr class="mmeta"><td colspan="2"><span style="font-style:italic;">(Mandatory)</span></td></tr><tr><th>Latitude:</th><td><input type="text" name="sids" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Longitude:</th><td><input type="text" name="county" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr></tbody></table>
+
+<h2>Crop Management</h2><table class="input_opts" style="margin-top:8px;"><tbody><tr class="mmeta"><td colspan="2"><span style="font-style:italic;">(Mandatory)</span></td></tr><tr class="mmeta"><th>Planting Date:</th><td><input type="text" name="climdiv" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Relative maturity:</th><td><input type="text" name="cwa" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Plant Population:</th><td><input type="text" name="basin" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>State:</th><td><input type="text" name="state" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Bounding box:</th><td><input type="text" name="bbox" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr></tbody></table>
+
+<h2>Soil Properties</h2><table class="input_opts" style="margin-top:8px;"><tbody><tr class="mmeta"><td colspan="2"><span style="font-style:italic;">(Mandatory)</span></td></tr><tr class="mmeta"><th>Soil rooting depth :</th><td><input type="text" name="climdiv" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Soil surface residues coverage:</th><td><input type="text" name="cwa" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Top soil bulk density:</th><td><input type="text" name="basin" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Top soil(1 foot) moisture at planting <br>(% of available water)</th><td><input type="text" name="state" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Sub soil(below 1 foot) moisture at planting<br>(% of available water):</th><td><input type="text" name="bbox" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr>
+
+<tr class="mmeta"><td colspan="2"><span style="font-style:italic;">(Optional)</span></td></tr>
+<tr class="mmeta"><th>Top soil(1 foot) texture:</th><td><input type="text" name="climdiv" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr><tr class="mmeta"><th>Sub soil(below 1 foot) texture:</th><td><input type="text" name="cwa" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr>
+</tbody></table>
+
+
+<h2>Irrigation Records</h2>
+	<table class="input_opts" style="margin-top:8px;"><tbody>
+	<tr class="mmeta"><td colspan="2"><span style="font-style:italic;">(If applicable)</span></td></tr>
+	<tr class="mmeta"><th>Date:</th><td><input type="text" name="irdate" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr>
+	<tr class="mmeta"><th>Amount:</th><td><input type="text" name="iramount" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr>
+	<tr class="mmeta"><th>Plant Population:</th><td><input type="text" name="basin" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr>
+	<tr class="mmeta"><th>State:</th><td><input type="text" name="state" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr>
+	<tr class="mmeta"><th>Bounding box:</th><td><input type="text" name="bbox" size="22" class="ui-widget-content ui-corner-all ui-state-default"></td></tr></tbody></table>
+
+
+
+<p><button id="request_submit" class="submitButton ui-widget-content ui-corner-all ui-state-default ui-button ui-widget ui-button-text-only" role="button"><span class="ui-button-text">Submit</span></button></p></div>
+
+<!-- <hr /> -->
+<div id="elems_table" style="display: none;">
+	<table class="codes">
+	<caption>Common Element Codes</caption>
+	<tbody><tr><th>Abbreviation </th><th>Var Major </th><th>Description</th></tr>
+	<tr><td>maxt </td><td>1  </td><td>Maximum temperature (°F)</td></tr>
+	<tr><td>mint </td><td>2  </td><td>Minimum temperature (°F)</td></tr>
+	<tr><td>avgt </td><td>43 </td><td>Average temperature (°F)</td></tr>
+	<tr><td>obst </td><td>3  </td><td>Obs time temperature (°F)</td></tr>
+	<tr><td>pcpn </td><td>4  </td><td>Precipitation (inches)</td></tr>
+	<tr><td>snow </td><td>10 </td><td>Snowfall (inches)</td></tr>
+	<tr><td>snwd </td><td>11 </td><td>Snow Depth (inches)</td></tr>
+	<tr><td>     </td><td>7  </td><td>Pan evaporation (inches) </td></tr>
+	<tr><td>cdd  </td><td>   </td><td>Cooling degree days (default base 65) </td></tr>
+	<tr><td>hdd  </td><td>45 </td><td>Degree days below base (default base 65) </td></tr>
+	<tr><td>gdd  </td><td>44 </td><td>Degree days above base (default base 50) </td></tr>
+	<tr><td>cddXX</td><td>-  </td><td>Cooling Degree Days; where XX is base temperature </td></tr>
+	<tr><td>hddXX</td><td>-  </td><td>Heating Degree Days; where XX is base temperature </td></tr>
+	<tr><td>gddXX</td><td>-  </td><td>Growing Degree Days; where XX is base temperature </td></tr>
+	</tbody><tfoot>
+	<tr><td colspan="3"><i>Degree days can also be specified within an <code>elems</code>
+	object with the keys "name" (or "vX") and "base".</i></td></tr>
+	</tfoot>
+	</table>
+</div>
+
+<div id="meta_table" style="display: none;">
+	<table class="codes">
+	<caption>Meta Options</caption>
+	<tbody><tr><th>Code  </th><th>Description </th></tr>
+	<tr><td>name  </td><td>Station name  </td></tr>
+	<tr><td>state </td><td>2-letter state abbrev </td></tr>
+	<tr><td>sids  </td><td>Array of station ids/types </td></tr>
+	<tr><td>sid_dates  </td><td>Date range for each sid </td></tr>
+	<tr><td>ll    </td><td>Longitude and latitude </td></tr>
+	<tr><td>elev  </td><td>Elevation </td></tr>
+	<tr><td>uid   </td><td>CSIS id </td></tr>
+	<tr><td>county</td><td>5-digit FIPS id </td></tr>
+	<tr><td>climdiv</td><td>4-character climate division id </td></tr>
+	<tr><td>valid_daterange   </td><td>Valid date range (by variable) </td></tr>
+	</tbody></table>
+</div>
+
+
+<div id="add_table" style="display: none;">
+	<table class="codes">
+	<caption>Additions Codes</caption>
+	<thead>
+	<tr><th>Code  </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>f </td><td>Flags </td></tr>
+	<tr><td>t </td><td>Time of observation </td></tr>
+	<tr><td>i </td><td>Station ID associated with data </td></tr>
+	<tr><td>v </td><td>Var minor associated with data </td></tr>
+	<tr><td>n </td><td>Network associated with data </td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="normal_table" style="display: none;">
+	<table class="codes">
+	<caption>Normals Codes</caption>
+	<thead>
+	<tr><th>Code  </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>1 </td><td>Display normals </td></tr>
+	<tr><td>departure </td><td>Display departure from normal </td></tr>
+	<tr><td colspan="2">Normals are for the period 1981-2010 </td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="interval_table" style="display: none;">
+	<table class="codes">
+	<caption>Interval Options</caption>
+	<tbody><tr><th>Code </th><th>Description</th></tr>
+	<tr><td>dly </td><td>results have daily time step </td></tr>
+	<tr><td>mly </td><td>results have monthly time step </td></tr>
+	<tr><td>yly </td><td>results have yearly time step </td></tr>
+	<tr><td style="vertical-align:top;"><i>list</i> 
+	</td><td id="interval_hover"><span>- Hover here to show details -</span>
+	<div id="interval_details" style="display:none;">
+		This can also be specified as an array containing a single positive integer and zeros. The 
+		array can have a length of either 1, 2 or 3, with the length indicating the temporal 
+		precision of the returned values. A length of 1 indicates annual precision, 2 monthly 
+		precision and 3 daily precision. The position of integers within the array signifies 
+		the frequency of the values returned. The strings "dly", "mly" and "yly" are shortcuts 
+		for commonly used intervals as shown in the following table:		
+		<table style="border-collapse:collapse;">
+			<tbody><tr><th>String</th><th>Array</th><th>Explanation</th></tr>
+			<tr><td>dly</td><td>[0,0,1]</td><td>A daily value is returned for each day.</td></tr>
+			<tr><td>mly</td><td>[0,1]</td><td>A monthly value is returned for each calendar month.</td></tr>
+			<tr><td>yly</td><td>[1]</td><td>An annual value is returned for each year.</td></tr>
+		</tbody></table>
+		Using an array for <code>interval</code> facilitates a number of more complex requests. The 
+		following examples demonstrate some of these capabilities:
+		<table style="border-collapse:collapse;">
+			<tbody><tr><th>Array</th><th>Explanation</th></tr>
+			<tr><td>[1,0,0]</td><td>Return a daily value once per year. For instance, daily rainfall for June 20  in each of a series of years.</td></tr>
+			<tr><td>[0,1,0]</td><td>Return a daily value once per month. For instance, max temperature on the 15th of each month for a series of years.</td></tr>
+			<tr><td>[0,0,7]</td><td>Return a daily value every seven days.</td></tr>
+			<tr><td>[0,3,0]</td><td>Return a daily value every third month.</td></tr>
+			<tr><td>[0,3]</td><td>Return a monthly value every third month.</td></tr>
+		</tbody></table>
+	</div>
+	</td></tr>
+	<tr><td colspan="2"><i>Note: <code>interval</code> must be the same for all objects in an <code>elems</code> array.</i></td></tr>
+	</tbody></table>
+</div>
+
+<div id="duration_table" style="display: none;">
+	<table class="codes">
+	<caption>Duration Options</caption>
+	<tbody><tr><th>Code </th><th>Description </th><th>Valid with intervals</th></tr>
+	<tr><td>dly </td><td>Daily </td><td>dly </td></tr>
+	<tr><td>mly </td><td>Monthly; must specify reduce </td><td>mly </td></tr>
+	<tr><td>yly </td><td>Yearly; must specify reduce </td><td>yly </td></tr>
+	<tr><td>mtd </td><td>Month-to-date; must specify reduce </td><td>dly </td></tr>
+	<tr><td>ytd </td><td>Year-to-date; must specify reduce </td><td>dly, mly </td></tr>
+	<tr><td>std </td><td>Season-to-date; must specify reduce and season_start </td><td>dly, mly </td></tr>
+	<tr><td><i>integer</i> </td><td>Length of period to be analyzed in units specified in interval </td><td>dly, mly, yly </td></tr>
+	</tbody></table>
+</div>
+
+<div id="reduce_table" style="display: none;">
+	<table class="codes">
+	<caption>Reduction Types</caption>
+	<thead>
+	<tr><th>Code  </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>max  </td><td>Maximum value for the period </td></tr>
+	<tr><td>min  </td><td>Minimum value for the period </td></tr>
+	<tr><td>sum  </td><td>Sum of the values for the period </td></tr>
+	<tr><td>mean </td><td>Average of the values for the period </td></tr>
+	<tr><td>stddev </td><td>Standard deviation of the values (GridData only) </td></tr>
+	<tr><td>list </td><td>Array of daily values for the period </td></tr>
+	<tr><td>cnt_xx_yyy </td><td>Count of number of daily values passing threshold </td></tr>
+	<tr><td>pct_xx_yyy </td><td>Percent (integer) of daily values passing threshold </td></tr>
+	<tr><td>fct_xx_yyy </td><td>Fraction (float) of daily values passing threshold </td></tr>
+	<tr><td>first_xx_yyy </td><td>First occurrence of daily value passing threshold </td></tr>
+	<tr><td>last_xx_yyy </td><td>Last occurrence of daily value passing threshold </td></tr>
+	<tr><td>run_xx_yyy </td><td>Consecutive daily values passing threshold </td></tr>
+	<tr><td> </td><td>xx is operator (ge, gt, le, lt, eq, ne)<br>
+			yyy is threshold (integer or floating point)<br ?="">
+			Examples: cnt_ge_0.01, pct_eq_100</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="season_start_table" style="display: none;">
+	<table class="codes">
+	<caption>Season Start Description</caption>
+	<thead>
+	<tr><th>Description  </th><th>Examples</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>For interval of dly - month and day </td><td>[12,21] or 06-20</td></tr>
+	<tr><td>For interval of mly - just month  </td><td>3 </td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="maxmissing_table" style="display: none;">
+	<table class="codes">
+	<caption>Max Missing Option</caption>
+	<thead>
+	<tr><th>Description  </th></tr>
+	</thead>
+	<tbody>
+	<tr><td>Integer value indicating the number missing daily values to allow before a reduction is reported as missing.</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="prec_table" style="display: none;">
+	<table class="codes">
+	<caption>Precision Option</caption>
+	<thead>
+	<tr><th>Description  </th></tr>
+	</thead>
+	<tbody>
+	<tr><td>Integer value indicating the number of decimal places of precision displayed in the results for this element.</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="elems_keys_table" style="display: none;">
+	<table class="codes">
+	<caption>Elems Object Keywords</caption>
+	<tbody><tr><th>Keyword </th><th>Value </th><th>Examples</th></tr>
+	<tr><td>name     </td><td>Element code   </td><td>maxt, pcpn </td></tr>
+	<tr><td>vX       </td><td>Var major or var major.minor   </td><td>1, 10.4 </td></tr>
+	<tr><td>vN       </td><td>Var minor (must also specify <code>vX</code>)  </td><td>4 </td></tr>
+	<tr><td>base </td><td>Base temperature for degree days </td><td>mly </td></tr>
+	<tr><td>interval </td><td>dly (daily), mly (monthly), yly (yearly) or list </td><td>mly </td></tr>
+	<tr><td>duration </td><td>dly (daily), mly (monthly), yly (yearly), mtd (month-to-date), std (season-to-date), ytd (year-to-date) or integer </td><td>mtd </td></tr>
+	<tr><td>season_start </td><td>Season start date - only valid with duration of <code>std</code> </td><td>[12,21], 06-20 </td></tr>
+	<tr><td rowspan="2">reduce   </td><td>Data summary or reduction type </td><td>sum, mean </td></tr>
+	<tr><td>For cnt, pct or fct, append "_operator_threshold". <br>Valid operators are eq, le, lt, ge, gt, ne </td><td>cnt_lt_32, pct_ge_0.01 </td></tr>
+	<tr><td>add  </td><td>Additional information to be appended.<br>Valid operators are f, t, i, v, n, s </td><td>t, f </td></tr>
+	<tr><td>smry  </td><td>Column summary statistics </td><td>mean </td></tr>
+	<tr><td>smry_only  </td><td>Return only summary values (1 for true) </td><td>1 </td></tr>
+	<tr><td>normal  </td><td>Normals - valid options: 1 or "departure" </td><td>1 </td></tr>
+	<tr><td>maxmissing  </td><td>Allowable number of missing values </td><td>5 </td></tr>
+	<tr><td>prec  </td><td>Decimal places of precision of results </td><td>3 </td></tr>
+	<tr><td>groupby </td><td>Group together days or months of data for a year</td><td>["year","06-01","08-31"]</td></tr>
+	</tbody></table>
+</div>
+
+<div id="output_table" style="display: none;">
+	<table class="codes">
+	<caption>Output Options</caption>
+	<thead>
+	<tr><th>Code  </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>json  </td><td>JavaScript Object Notation (default) </td></tr>
+	<tr><td>csv  </td><td>Comma-Separated Values (unavailable for some requests, such as those including "add", "smry" or "meta" and MultiStnData requests for a day range)  </td></tr>
+	<tr><td>image  </td><td>png image only (only valid for GridData calls)</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="state_table" style="display: none;">
+	<table class="codes">
+	<caption>State Description</caption>
+	<thead>
+	<tr><th>Description  </th><th>Examples</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>One or more 2-letter state postal codes </td><td>MO, KS</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="general_table" style="display: none;">
+	<table class="codes">
+	<caption>General Meta Keywords by Area</caption>
+	<tbody><tr><th>Area </th><th> ID Type </th><th>Available Meta Keywords</th></tr>
+	<tr><td>state    </td><td>Postal         </td><td>id, name, bbox, geojson, state</td></tr>
+	<tr><td>county   </td><td>FIPS           </td><td>id, name, bbox, geojson, state</td></tr>
+	<tr><td>climdiv  </td><td>Divison number </td><td>id, name, bbox, geojson, state</td></tr>
+	<tr><td>cwa      </td><td>NWS CWA        </td><td>id, name, bbox, geojson</td></tr>
+	<tr><td>basin    </td><td>8-digit HUC    </td><td>id, name, bbox, geojson</td></tr>
+	</tbody></table>
+</div>
+
+<div id="date_table" style="display: none;">
+	<table class="codes">
+	<caption>Date Secifications</caption>
+	<tbody><tr><th>Options</th><th>Example</th></tr>
+	<tr><td>yyyy-mm-dd </td><td>2010-01-31 </td></tr>
+	<tr><td>yyyymmdd </td><td>20100131 </td></tr>
+	<tr><td>por (period of record) </td><td>por </td></tr>
+	<tr><td colspan="2">Sometimes only yyyy or yyyymm required.</td></tr>
+	</tbody></table>
+</div>
+
+<div id="bbox_table" style="display: none;">
+	<table class="codes">
+	<caption>Bounding Box Format</caption>
+	<tbody><tr><th>Description </th><th>Example</th></tr>
+	<tr><td>Bounds in decimal degrees (W, S, E, N); negative values for South latitude and West longitude </td><td>-90, 40, -88, 41</td></tr>
+	</tbody></table>
+</div>
+
+<div id="loc_table" style="display: none;">
+	<table class="codes">
+	<caption>Location Format</caption>
+	<tbody><tr><th>Description </th><th>Example</th></tr>
+	<tr><td>Point location defined in decimal degrees (longitude, latitude); negative values for South latitude and West longitude </td><td>-77.7, 41.8</td></tr>
+	</tbody></table>
+</div>
+
+<div id="area_reduce_table" style="display: none;">
+	<table class="codes">
+	<caption>Area Reduction Types</caption>
+	<thead>
+	<tr><th>Code  </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>aaaa_max  </td><td>Maximum grid value in area </td></tr>
+	<tr><td>aaaa_min  </td><td>Minimum grid value in area </td></tr>
+	<tr><td>aaaa_mean </td><td>Average of all grid values in the area </td></tr>
+	<tr><td> </td><td>aaaa is area type ("county", "climdiv", "basin", "state")<br>
+			Examples: county_max</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="groupby_table" style="display: none;">
+	<table class="codes">
+	<caption>Group By Types <b>(to be deprecated)</b></caption>
+	<thead>
+	<tr><th>Code  </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>year  </td><td>Results will be returned with all data for a year in a list. </td></tr>
+	<tr><td>year, mm-dd, mm-dd  </td><td>Results will be returned with all daily data between specified start date and end date in a list identified 
+	by ending year.</td></tr>
+	<tr><td>year, mm, mm  </td><td>Monthly summarized data will be returned for all months between specified start month and end month in a list identified 
+	by ending year.</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="units_table" style="display: none;">
+	<table class="codes">
+	<caption>Units Codes</caption>
+	<thead>
+	<tr><th>Code </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>degreeC </td><td>Temperatures degrees C.</td></tr>
+	<tr><td>degreeF </td><td>Temperatures degrees F.</td></tr>
+	<tr><td>degreeK </td><td>Temperatures degrees K.</td></tr>
+	<tr><td>inch    </td><td>Precipitation inches.</td></tr>
+	<tr><td>mm      </td><td>Precipitation millimeters.</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="type_table" style="display: none;">
+	<table class="codes">
+	<caption>Type Codes</caption>
+	<thead>
+	<tr><th>Code </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>png </td><td>png image </td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="info_only_table" style="display: none;">
+	<table class="codes">
+	<caption>Info Only Codes</caption>
+	<thead>
+	<tr><th>Code </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>1 </td><td>Only information about the map is returned, not png image </td></tr>
+	<tr><td>&nbsp;</td><td>If not specified, png image is returned in data portion of JSON object </td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="proj_table" style="display: none;">
+	<table class="codes">
+	<caption>Projection Types</caption>
+	<thead>
+	<tr><th>Code </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>lcc </td><td>Lambert conformal conic (default) </td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="overlays_table" style="display: none;">
+	<table class="codes">
+	<caption>Overlay Types</caption>
+	<thead>
+	<tr><th>Code </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td>state  </td><td>State borders </td></tr>
+	<tr><td>county </td><td>County borders </td></tr>
+	<tr><td colspan="2">Line width and color can also be specified, separated by colons.<br>
+	                  For example, ["state:1:red", "county:1:blue"]</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="width_height_table" style="display: none;">
+	<table class="codes">
+	<caption>Width and Height Specifications</caption>
+	<thead>
+	<tr><th>Code </th><th>Description</th></tr>
+	</thead>
+	<tbody>
+	<tr><td><i>integer</i> </td><td>Specify either width or height of png image in pixels; only specify one or the other.</td></tr>
+	</tbody>
+	</table>
+</div>
+
+<div id="levels_table" style="display: none;">
+	<table class="codes">
+	<caption>Contour Level Specification</caption>
+	<thead>
+	<tr><th>Description</th><td>Example</td></tr>
+	</thead>
+	<tbody>
+	<tr><td>Comma-separated list of contour levels </td><td>0,5,10,15,20</td></tr>
+	<tr><td colspan="2" style="text-align:center;">Will be determined by server if not specified.</td></tr>
+	</tbody>
+	</table>
+</div>
+
+</div>
+
+<div id="output" style="display: none;">
+	<h2 id="jparams_h2">Parameters (JSON)</h2>
+	<div id="jparams" contenteditable="true">Parameters will appear here.</div>
+	<h2 id="jresults_h2"><span>Results</span> <button id="formatButton" class="otherButtons ui-corner-all ui-state-default">Format</button></h2>
+	<div id="jresults">Results will appear here.</div>
+
+	</div>
+<div style="font-size: 20px;">
+	<br><br><br><br>
+	<div id="api_table" style="display: none;">
+		<table class="codes">
+			<caption>Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Unit </th><th>Description </th><th>Example</th></tr>
+			<tr><td>APIKey </td><td> String</td><td> A hex-code of 32 chars provided to you during <registration class=""></registration></td><td>e57c858f031526a86bcd7caf50842cf2</td></tr>
+			</tbody></table>
+	</div>
+	<div id="sid_table" style="display: none;">
+		<table class="codes">
+			<caption>Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Unit </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Station State </td><td> String</td><td>2-letter state abbrev </td><td>WI</td></tr>
+			<tr><td>Station Id </td><td> AWDN Id</td><td>6-digit AWDN id </td><td>a050119</td></tr>
+			<tr><td>Station Name </td><td> Chars </td><td> Station Name or part of it </td><td>CARBON or CARBONDALE</td></tr>
+			</tbody></table>
+	</div>
+
+	<div id="fc_table" style="display: none;">
+		<table class="codes">
+			<caption>Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Unit </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Latitude </td><td> Number(decimals) </td><td> -180 &deg; to 180 &deg; </td><td> 43.0731 (for Madison, WI)</td></tr>
+			<tr><td>Longitude </td><td> Number(decimals) </td><td> -180 &deg; to 180 &deg; </td><td>-89.4012 (for Madison, WI)</td></tr>
+			</tbody></table>
+
+	</div>
+	<div id="soy_cm_table" style="display: none;">
+		<table class="codes">
+			<caption>Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Type </th><th>Description </th><th>Example</th></tr>
+			<!--<tr><td>Planting Date </td><td> Date</td><td>MM/DD/YYYY </td><td>05/01/2018</td></tr> -->
+			<tr><td>Maturity Group </td><td> Double</td><td>Between 1.0 to 4.5 </td><td>3.0</td></tr>
+			</tbody></table>
+	</div>
+	<div id="pd_table" style="display: none;">
+		<table class="codes">
+			<caption>Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Unit </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Planting Date </td><td> mm/dd/yy</td><td>Date of Planting the crop </td><td>05/01/2018</td></tr>
+			</tbody></table>
+	</div>
+
+	<div id="corn_cm_table" style="display: none;">
+		<table class="codes">
+			<caption>Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Unit </th><th>Description </th><th>Example</th></tr>
+	<!--		<tr><td>Planting Date </td><td> mm/dd/yy</td><td>Date of Planting the crop </td><td>05/01/2018</td></tr> -->
+			<tr><td>Relative Maturity </td><td> Days</td><td>Between 90 to 125 </td><td>90</td></tr>
+			<tr><td>Plant Population </td><td> x1000/acre</td><td>Between 20 to 45 </td><td>30</td></tr>
+			</tbody></table>
+	</div>
+
+	<div id="srd_table" style="display: none;">
+		<table class="codes">
+			<caption>Soil Properties- Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Type </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Rooting Depth </td><td> Number</td><td>Soil rooting depth in inches (between 20 to 50) </td><td>35</td></tr>
+			</tbody></table>
+	</div>
+
+			<div id="soy_sp_table" style="display: none;">
+		<table class="codes">
+			<caption>Soil Properties- Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Type </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Initial Water </td><td> Percentage </td><td> Available water percentage on planting date (between 0% to 100%) </td><td>75 %</td></tr>
+			<tr><td>Average Soil Texture </td><td> Number</td><td>Soil texture to rooting depth (between 1 to 7) </td><td>3</td></tr>
+			<tr><td>Seed Depth </td><td> Double</td><td>Between 1.0 to 4.5 </td><td>1.18</td></tr>
+			<tr><td>Water Depletion </td><td> Percentage</td><td> Soil water depletion theshold(between 0% to 100%) </td><td>65%</td></tr>
+			</tbody></table>
+	</div>
+
+	<div id="corn_sp_table" style="display: none;">
+		<table class="codes">
+			<caption>Soil Properties- Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Type </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Surface residues coverage </td><td> Percentage </td><td> Available water percentage on planting date (between 0% to 100%) </td><td>75 %</td></tr>
+			<tr><td>Top soil bulk density </td><td> Double</td><td>Between 1.2 to 1.5  </td><td>3.0</td></tr>
+			<tr><td>Top soil (1 foot) moisture at planting </td><td> Percentage</td><td>Between 25%(Dry) and 100%(Very wet) </td><td>75%</td></tr>
+			<tr><td>Sub soil (1 foot) moisture at planting </td><td> Percentage</td><td>Between 25%(Dry) and 100%(Very wet) </td><td>75%</td></tr>
+			<tr><td>Top soil (1 foot) texture </td><td> Number</td><td> (between 1 to 7) </td><td>3</td></tr>
+			<tr><td>Sub soil (below 1 foot) texture </td><td> Number</td><td> (between 1 to 7) </td><td>3</td></tr>
+			</tbody></table>
+	</div>
+
+	<div id="ir_table" style="display: none;">
+		<table class="codes">
+			<caption>Irrigation - Input Examples</caption>
+			<tbody><tr><th>Input </th><th>Type </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Irrigation Date </td><td> Date</td><td>MM/DD/YYYY </td><td>05/01/2018</td></tr>
+			<tr><td>Irrigation Amount </td><td> Double</td><td>Between 1.0 to 4.5 </td><td>1.18</td></tr>
+			</tbody></table>
+	</div>
+
+	<div id="sim_table" style="display: none;">
+		<table class="codes" width = "800">
+			<caption>Output Description</caption>
+			<tbody><tr><th>Type </th><th>Description </th><th>Example</th></tr>
+			<tr><td>Crop Stage </td><td  width="500"> Simulation data of crop-stage and growth from the planting date to 10 days in advance. </td><td></td></tr>
+			<tr><td>Available Water </td><td>Available water within active rooting zone, available water of the first, second and third foot of soil, available soil water at a 50% depletion </td><td></td></tr>
+			<tr><td>Water Stress </td><td>A number in range 0 to 1 that predicts whether the crop is already under water-stress, or will be subjected to water-stress in near future.</td><td></td></tr>
+			<tr><td>Agg Information </td><td>initial water available to active rooting depth, total rainfall amount since planting, total water consumption, total irrigation amount and water losses by drainage and canopy interception.  </td><td></td></tr>
+			</tbody></table>
+	</div>
+</div>
+
+	</div>
+<div style="clear:both;">
+
+
+<!--<a href="http://hprcc-agron0.unl.edu/cornsoywater/public_html/web_services.php" target="_blank">Full documentation</a> -->
+
+</div>
+	<!--<div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-front ui-draggable ui-resizable" tabindex="-1" role="dialog" aria-describedby="infoDialog" aria-labelledby="ui-id-1" style="display: none; position: absolute;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix ui-draggable-handle"><span id="ui-id-1" class="ui-dialog-title">&nbsp;</span>
+	<button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-icon-only ui-dialog-titlebar-close" role="button" title="Close"><span class="ui-button-icon-primary ui-icon ui-icon-closethick"></span><span class="ui-button-text">Close</span></button></div><div id="infoDialog" class="ui-dialog-content ui-widget-content"> </div><div class="ui-resizable-handle ui-resizable-n" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-e" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-s" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-w" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-sw" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-ne" style="z-index: 90;"></div><div class="ui-resizable-handle ui-resizable-nw" style="z-index: 90;"></div></div> -->
+
+</body></html>
